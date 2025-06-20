@@ -1,4 +1,8 @@
 today=`date -u "+%Y-%m-%d"`
+echo "Working dir: $(pwd)"
+ls -l
+ls -l data
+ls -l assets
 cd daily_arxiv
 scrapy crawl arxiv -o ../data/${today}.jsonl
 
