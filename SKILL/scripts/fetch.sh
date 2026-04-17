@@ -28,7 +28,7 @@ const puppeteer = require('puppeteer');
   const browser = await puppeteer.launch({headless: 'new'});
   const page = await browser.newPage();
   await page.goto('$url', {waitUntil: 'networkidle0'});
-  const content = await page.content();
+  const content = await page.evaluate(() => document.body.textContent);
   console.log(content);
   await browser.close();
 })();
