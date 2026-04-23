@@ -872,13 +872,15 @@ async function loadPapersByDate(date) {
       const targetCategory = urlCategoryParam || urlJsonParam || 'all';
       let papers = getPapersByCategory(paperData, targetCategory);
 
-      // 应用keywords和author匹配（"或"关系）
-      if (urlKeywordsParam !== null || urlAuthorParam !== null) {
-        papers = matchPapersByKeywordsOrAuthor(papers, urlKeywordsParam, urlAuthorParam);
-      }
+      // 只有当keywords或author非空时才应用匹配
+      const hasKeywords = urlKeywordsParam && urlKeywordsParam.length > 0;
+      const hasAuthor = urlAuthorParam && urlAuthorParam.length > 0;
 
-      // JSON模式：只返回匹配的论文
-      papers = papers.filter(p => p.isMatched);
+      if (hasKeywords || hasAuthor) {
+        papers = matchPapersByKeywordsOrAuthor(papers, urlKeywordsParam, urlAuthorParam);
+        // JSON模式：只返回匹配的论文
+        papers = papers.filter(p => p.isMatched);
+      }
 
       outputJsonData(papers, targetCategory);
       return;
@@ -1736,13 +1738,15 @@ async function loadPapersByDateRange(startDate, endDate) {
       const targetCategory = urlCategoryParam || urlJsonParam || 'all';
       let papers = getPapersByCategory(paperData, targetCategory);
 
-      // 应用keywords和author匹配（"或"关系）
-      if (urlKeywordsParam !== null || urlAuthorParam !== null) {
-        papers = matchPapersByKeywordsOrAuthor(papers, urlKeywordsParam, urlAuthorParam);
-      }
+      // 只有当keywords或author非空时才应用匹配
+      const hasKeywords = urlKeywordsParam && urlKeywordsParam.length > 0;
+      const hasAuthor = urlAuthorParam && urlAuthorParam.length > 0;
 
-      // JSON模式：只返回匹配的论文
-      papers = papers.filter(p => p.isMatched);
+      if (hasKeywords || hasAuthor) {
+        papers = matchPapersByKeywordsOrAuthor(papers, urlKeywordsParam, urlAuthorParam);
+        // JSON模式：只返回匹配的论文
+        papers = papers.filter(p => p.isMatched);
+      }
 
       outputJsonData(papers, targetCategory);
       return;
