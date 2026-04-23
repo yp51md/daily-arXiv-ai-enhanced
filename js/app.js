@@ -225,54 +225,42 @@ function getJsonParam() {
   return json ? decodeURIComponent(json) : null;
 }
 
-// 从URL参数中获取author（可以为空字符串）
+// 从URL参数中获取author
 function getUrlAuthor() {
   const params = new URLSearchParams(window.location.search);
   const author = params.get('author');
-  if (author === null) return null;
-  return decodeURIComponent(author);
+  return author ? decodeURIComponent(author) : null;
 }
 
-// 从URL参数中获取keywords（可以为空数组）
+// 从URL参数中获取keywords
 function getUrlKeywords() {
   const params = new URLSearchParams(window.location.search);
   const keywords = params.get('keywords');
-  if (keywords === null) return null;
-  return decodeURIComponent(keywords).split(',').map(k => k.trim()).filter(k => k);
+  return keywords ? decodeURIComponent(keywords).split(',').map(k => k.trim()).filter(k => k) : null;
 }
 
 // 检查是否以JSON模式运行
 function isJsonMode() {
-  const params = new URLSearchParams(window.location.search);
-  return params.has('category') || params.has('json') || params.has('author') || params.has('keywords');
+  return getUrlCategory() !== null || getJsonParam() !== null || getUrlAuthor() !== null || getUrlKeywords() !== null;
 }
 
 // 输出JSON格式的论文数据
 function outputJsonData(papers, category) {
   const jsonData = {
-    category: category
+    category: category,
+    author: urlAuthorParam || null,
+    keywords: urlKeywordsParam || null,
+    count: papers.length,
+    papers: papers.map(p => ({
+      id: p.id,
+      title: p.title,
+      authors: p.authors,
+      categories: p.category,
+      summary: p.summary,
+      date: p.date,
+      url: p.url
+    }))
   };
-
-  // 只有非空的 author 才添加到输出
-  if (urlAuthorParam) {
-    jsonData.author = urlAuthorParam;
-  }
-
-  // 只有非空的 keywords 才添加到输出
-  if (urlKeywordsParam && urlKeywordsParam.length > 0) {
-    jsonData.keywords = urlKeywordsParam;
-  }
-
-  jsonData.count = papers.length;
-  jsonData.papers = papers.map(p => ({
-    id: p.id,
-    title: p.title,
-    authors: p.authors,
-    categories: p.category,
-    summary: p.summary,
-    date: p.date,
-    url: p.url
-  }));
 
   // 清空页面内容
   document.body.innerHTML = '';
@@ -285,24 +273,22 @@ function outputJsonData(papers, category) {
 // 根据category获取论文（复用现有逻辑）
 function getPapersByCategory(paperData, category) {
   let papers = [];
-  const categoryLower = category.toLowerCase();
-  if (categoryLower === 'all') {
+  if (category === 'all') {
     const { sortedCategories } = getAllCategories(paperData);
     sortedCategories.forEach(cat => {
       if (paperData[cat]) {
         papers = papers.concat(paperData[cat]);
       }
     });
-  } else if (paperData[categoryLower]) {
-    papers = paperData[categoryLower];
+  } else if (paperData[category]) {
+    papers = paperData[category];
   }
   return papers;
 }
 
 // 根据keywords匹配论文（复用现有逻辑：关键词之间是"或"关系）
 function matchPapersByKeywords(papers, keywords) {
-  // keywords为空数组时，所有论文都匹配
-  if (!keywords || keywords.length === 0) return papers.map(p => ({ ...p, isMatched: true, matchReason: null }));
+  if (!keywords || keywords.length === 0) return papers.map(p => ({ ...p, isMatched: false, matchReason: null }));
 
   return papers.map(paper => {
     const matches = keywords.some(keyword => {
@@ -327,8 +313,7 @@ function matchPapersByKeywords(papers, keywords) {
 
 // 根据author匹配论文（复用现有逻辑）
 function matchPapersByAuthor(papers, author) {
-  // author为空字符串时，所有论文都匹配
-  if (!author) return papers.map(p => ({ ...p, isMatched: true, matchReason: null }));
+  if (!author) return papers.map(p => ({ ...p, isMatched: false, matchReason: null }));
 
   return papers.map(paper => {
     const matches = paper.authors.toLowerCase().includes(author.toLowerCase());
@@ -867,13 +852,14 @@ async function loadPapersByDate(date) {
     renderCategoryFilter(categories);
 
     // 如果URL中有category、json、author或keywords参数，直接返回JSON
-    if (isJsonMode()) {
+    const hasJsonParams = urlCategoryParam !== null || urlJsonParam !== null || urlAuthorParam !== null || urlKeywordsParam !== null;
+    if (hasJsonParams) {
       // 获取基础论文列表（按category或all）
       const targetCategory = urlCategoryParam || urlJsonParam || 'all';
       let papers = getPapersByCategory(paperData, targetCategory);
 
       // 应用keywords和author匹配（"或"关系）
-      if (urlKeywordsParam !== null || urlAuthorParam !== null) {
+      if (urlKeywordsParam || urlAuthorParam) {
         papers = matchPapersByKeywordsOrAuthor(papers, urlKeywordsParam, urlAuthorParam);
       }
 
@@ -1731,13 +1717,14 @@ async function loadPapersByDateRange(startDate, endDate) {
     renderCategoryFilter(categories);
 
     // 如果URL中有category、json、author或keywords参数，直接返回JSON
-    if (isJsonMode()) {
+    const hasJsonParams = urlCategoryParam !== null || urlJsonParam !== null || urlAuthorParam !== null || urlKeywordsParam !== null;
+    if (hasJsonParams) {
       // 获取基础论文列表（按category或all）
       const targetCategory = urlCategoryParam || urlJsonParam || 'all';
       let papers = getPapersByCategory(paperData, targetCategory);
 
       // 应用keywords和author匹配（"或"关系）
-      if (urlKeywordsParam !== null || urlAuthorParam !== null) {
+      if (urlKeywordsParam || urlAuthorParam) {
         papers = matchPapersByKeywordsOrAuthor(papers, urlKeywordsParam, urlAuthorParam);
       }
 
