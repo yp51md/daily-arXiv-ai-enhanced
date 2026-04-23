@@ -229,7 +229,7 @@ function getJsonParam() {
 function getUrlAuthor() {
   const params = new URLSearchParams(window.location.search);
   const author = params.get('author');
-  return author ? decodeURIComponent(author) : null;
+  return author ? decodeURIComponent(author).split(',').map(k => k.trim()).filter(k => k) : null;
 }
 
 // 从URL参数中获取keywords
