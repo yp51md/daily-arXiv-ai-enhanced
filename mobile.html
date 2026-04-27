@@ -160,22 +160,11 @@
             bottom: 0;
             padding: 20px;
             background: white;
-            transition: transform 0.3s ease, opacity 0.3s ease;
             border-radius: 16px;
             margin: 10px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
             touch-action: auto;
             overflow-y: auto;
-        }
-        
-        .paper-card.swipe-left {
-            transform: translateX(-100%);
-            opacity: 0;
-        }
-        
-        .paper-card.swipe-right {
-            transform: translateX(100%);
-            opacity: 0;
         }
         
         .card-content {
@@ -510,9 +499,6 @@
         <div class="header">
             <h1>Daily arXiv</h1>
             <div class="header-controls">
-                <div class="gesture-hint">
-                    左划收藏 · 右划下一篇
-                </div>
                 <div class="date-selector">
                     <input type="date" id="dateInput">
                 </div>
@@ -584,7 +570,6 @@
                 this.setupDateInput();
                 this.setupTabs();
                 this.setupExportButton();
-                this.setupSwipeGestures();
                 this.loadPapers();
             }
             
@@ -635,12 +620,10 @@
                             document.getElementById('cardContainer').style.display = 'block';
                             document.getElementById('collectionView').classList.remove('active');
                             document.querySelector('.category-filter').style.display = 'block';
-                            document.querySelector('.swipe-hint').style.display = 'block';
                         } else {
                             document.getElementById('cardContainer').style.display = 'none';
                             document.getElementById('collectionView').classList.add('active');
                             document.querySelector('.category-filter').style.display = 'none';
-                            document.querySelector('.swipe-hint').style.display = 'none';
                             this.renderCollections();
                         }
                     });
@@ -650,52 +633,6 @@
             setupExportButton() {
                 document.getElementById('exportBtn').addEventListener('click', () => {
                     this.exportCollections();
-                });
-            }
-            
-            setupSwipeGestures() {
-                const cardContainer = document.getElementById('cardContainer');
-                
-                cardContainer.addEventListener('touchstart', (e) => {
-                    this.swipeStartX = e.touches[0].clientX;
-                    this.swipeStartY = e.touches[0].clientY;
-                });
-                
-                cardContainer.addEventListener('touchmove', (e) => {
-                    if (!this.swipeStartX || !this.swipeStartY) return;
-                    
-                    const currentX = e.touches[0].clientX;
-                    const currentY = e.touches[0].clientY;
-                    const diffX = currentX - this.swipeStartX;
-                    const diffY = currentY - this.swipeStartY;
-                    
-                    // 左划收藏（水平滑动）
-                    if (diffX < -50 && Math.abs(diffY) < 50) {
-                        e.preventDefault();
-                        const paper = this.filteredPapers[this.currentIndex];
-                        if (paper) {
-                            this.toggleFavorite(paper.id);
-                            // 添加滑动动画
-                            const card = cardContainer.querySelector('.paper-card');
-                            if (card) {
-                                card.classList.add('swipe-left');
-                                setTimeout(() => {
-                                    card.classList.remove('swipe-left');
-                                }, 300);
-                            }
-                        }
-                    }
-                    
-                    // 右划下一篇（水平滑动）
-                    if (diffX > 50 && Math.abs(diffY) < 50) {
-                        e.preventDefault();
-                        this.nextCardWithAnimation();
-                    }
-                });
-                
-                cardContainer.addEventListener('touchend', () => {
-                    this.swipeStartX = 0;
-                    this.swipeStartY = 0;
                 });
             }
             
@@ -964,21 +901,6 @@
                 }
             }
             
-            nextCardWithAnimation() {
-                if (this.currentIndex < this.filteredPapers.length - 1) {
-                    const cardContainer = document.getElementById('cardContainer');
-                    const card = cardContainer.querySelector('.paper-card');
-                    if (card) {
-                        card.classList.add('swipe-right');
-                        setTimeout(() => {
-                            this.currentIndex++;
-                            this.saveState();
-                            this.renderCard(this.currentIndex);
-                        }, 300);
-                    }
-                }
-            }
-            
             toggleFavorite(paperId) {
                 const collectionKey = `favorites_${this.currentDate}`;
                 let dayFavorites = this.collections[collectionKey] || [];
@@ -1004,7 +926,14 @@
             loadCollections() {
                 try {
                     const stored = localStorage.getItem('arxiv_collections');
-                    return stored ? JSON.parse(stored) : {};
+                    if (!stored) return {};
+                    
+                    const data = JSON.parse(stored);
+                    // 处理导出格式的数据
+                    if (data.collections) {
+                        return data.collections;
+                    }
+                    return data;
                 } catch (error) {
                     console.error('加载收藏失败:', error);
                     return {};
@@ -1020,35 +949,49 @@
             }
             
             renderCollections() {
-                const collectionList = document.getElementById('collectionList');
-                
-                if (Object.keys(this.collections).length === 0) {
-                    collectionList.innerHTML = `<div class="error">还没有收藏的论文</div>`;
-                    return;
-                }
-                
-                let html = '';
-                Object.entries(this.collections).forEach(([dateKey, paperIds]) => {
-                    if (paperIds.length === 0) return;
+                try {
+                    const collectionList = document.getElementById('collectionList');
+                    if (!collectionList) {
+                        console.error('collectionList 元素不存在');
+                        return;
+                    }
                     
-                    const date = dateKey.replace('favorites_', '');
-                    html += `
-                        <div class="collection-section">
-                            <h3 style="margin: 16px 0 8px 0;">${date}</h3>
-                            ${paperIds.map(paperId => `
-                                <div class="collection-item">
-                                    <h4>论文 ID: ${paperId}</h4>
-                                    <div class="collection-actions">
-                                        <button class="action-btn" onclick="app.removeFromCollection('${dateKey}', '${paperId}')">移除</button>
-                                        <a href="https://arxiv.org/abs/${paperId}" target="_blank" class="action-btn">查看原文</a>
+                    console.log('收藏数据:', this.collections);
+                    
+                    if (!this.collections || Object.keys(this.collections).length === 0) {
+                        collectionList.innerHTML = `<div class="error">还没有收藏的论文</div>`;
+                        return;
+                    }
+                    
+                    let html = '';
+                    Object.entries(this.collections).forEach(([dateKey, paperIds]) => {
+                        if (!paperIds || paperIds.length === 0) return;
+                        
+                        const date = dateKey.replace('favorites_', '');
+                        html += `
+                            <div class="collection-section">
+                                <h3 style="margin: 16px 0 8px 0;">${date}</h3>
+                                ${paperIds.map(paperId => `
+                                    <div class="collection-item">
+                                        <h4>论文 ID: ${paperId}</h4>
+                                        <div class="collection-actions">
+                                            <button class="action-btn" onclick="app.removeFromCollection('${dateKey}', '${paperId}')">移除</button>
+                                            <a href="https://arxiv.org/abs/${paperId}" target="_blank" class="action-btn">查看原文</a>
+                                        </div>
                                     </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
-                });
-                
-                collectionList.innerHTML = html;
+                                `).join('')}
+                            </div>
+                        `;
+                    });
+                    
+                    collectionList.innerHTML = html;
+                } catch (error) {
+                    console.error('渲染收藏失败:', error);
+                    const collectionList = document.getElementById('collectionList');
+                    if (collectionList) {
+                        collectionList.innerHTML = `<div class="error">加载收藏失败: ${error.message}</div>`;
+                    }
+                }
             }
             
             removeFromCollection(dateKey, paperId) {
