@@ -26,6 +26,12 @@ This innovative tool transforms how you stay updated with arXiv papers by combin
 - Local preference storage for privacy
 - Flexible date range filtering
 
+📱 **Mobile-Friendly Version**
+- Dedicated mobile.html for optimal phone experience
+- Support for paper categories and AI-enhanced content
+- Local storage for favorites and support for exportation
+
+
 🧩 **SKILL System**
 - Plug-and-play skill modules for customizing paper filtering
 
@@ -46,6 +52,12 @@ https://github.com/user-attachments/assets/b25712a4-fb8d-484f-863d-e8da6922f9d7
 This repo will daily crawl arXiv papers about **cs.CV, cs.GR, cs.CL and cs.AI**, and use **DeepSeek** to summarize the papers in **Chinese**.
 If you wish to crawl other arXiv categories, use other LLMs, or other languages, please follow the instructions.
 Otherwise, you can directly use this repo in https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/. Please star it if you like :)
+
+## Mobile Version
+We also provide a dedicated mobile-friendly version for optimal phone experience:
+- **Access**: Open https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/mobile.html in your phone browser
+- **Features**: Full-screen paper cards, easy navigation, local favorites storage, and AI-enhanced content
+- **Usage**: Swipe between papers, tap to favorite, and use the bottom tabs to switch between browsing and favorites
 
 **Instructions:**
 1. Fork this repo to your own account and delete my own information in [by-me-a-coffee](./buy-me-a-coffee/README.md).
