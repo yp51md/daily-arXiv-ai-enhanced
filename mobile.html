@@ -11,6 +11,11 @@
             box-sizing: border-box;
         }
         
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -24,6 +29,9 @@
             background: white;
             min-height: 100vh;
             position: relative;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
         
         .header {
@@ -41,18 +49,29 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         
         .header h1 {
             font-size: 18px;
             font-weight: 600;
             color: #667eea;
+            flex: 1;
         }
         
         .header-controls {
             display: flex;
             align-items: center;
             gap: 8px;
+            flex: 1;
+            justify-content: flex-end;
+        }
+        
+        .gesture-hint {
+            font-size: 10px;
+            color: #666;
+            white-space: nowrap;
         }
         
         .date-selector {
@@ -119,11 +138,17 @@
             background: rgba(255, 255, 255, 0.2);
         }
         
-        .card-container {
+        .main-content {
+            flex: 1;
             margin-top: 120px;
-            margin-bottom: 60px;
+            margin-bottom: 120px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .card-container {
+            flex: 1;
             position: relative;
-            height: calc(100vh - 180px);
             overflow: hidden;
         }
         
@@ -135,12 +160,22 @@
             bottom: 0;
             padding: 20px;
             background: white;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, opacity 0.3s ease;
             border-radius: 16px;
             margin: 10px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            touch-action: none;
+            touch-action: auto;
             overflow-y: auto;
+        }
+        
+        .paper-card.swipe-left {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+        
+        .paper-card.swipe-right {
+            transform: translateX(100%);
+            opacity: 0;
         }
         
         .card-content {
@@ -174,12 +209,28 @@
             color: #ff4757;
         }
         
+        .paper-header {
+            margin-bottom: 16px;
+        }
+        
         .paper-title {
             font-size: 18px;
             font-weight: 600;
             line-height: 1.4;
+            margin-bottom: 8px;
+        }
+        
+        .paper-info {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 8px;
+        }
+        
+        .paper-meta {
+            font-size: 12px;
+            color: #667eea;
+            font-weight: 500;
             margin-bottom: 12px;
-            flex: 1;
         }
         
         .ai-summary {
@@ -245,17 +296,32 @@
             justify-content: flex-end;
         }
         
+        .nav-controls {
+            position: fixed;
+            bottom: 60px;
+            left: 0;
+            right: 0;
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 12px 16px;
+            border-top: 1px solid #f0f0f0;
+            display: flex;
+            gap: 8px;
+            z-index: 999;
+        }
+        
         .nav-btn {
+            flex: 1;
             background: #667eea;
             color: white;
             border: none;
-            padding: 8px 12px;
+            padding: 10px 12px;
             border-radius: 20px;
             font-size: 12px;
             cursor: pointer;
             transition: background 0.2s ease;
-            flex: 1;
-            min-width: 80px;
             text-align: center;
         }
         
@@ -308,9 +374,17 @@
         
         .collection-view {
             display: none;
-            margin-top: 70px;
-            margin-bottom: 60px;
+            position: fixed;
+            top: 70px;
+            left: 0;
+            right: 0;
+            bottom: 60px;
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
             padding: 20px;
+            overflow-y: auto;
+            z-index: 998;
         }
         
         .collection-view.active {
@@ -401,16 +475,13 @@
         }
         
         .swipe-hint {
-            position: fixed;
-            bottom: 70px;
-            left: 0;
-            right: 0;
             text-align: center;
             font-size: 12px;
             color: #999;
             padding: 8px;
             background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(10px);
+            border-top: 1px solid #f0f0f0;
         }
         
         @media (max-width: 480px) {
@@ -427,9 +498,9 @@
                 font-size: 13px;
             }
             
-            .card-container {
+            .main-content {
                 margin-top: 110px;
-                height: calc(100vh - 170px);
+                margin-bottom: 110px;
             }
         }
     </style>
@@ -439,6 +510,9 @@
         <div class="header">
             <h1>Daily arXiv</h1>
             <div class="header-controls">
+                <div class="gesture-hint">
+                    左划收藏 · 右划下一篇
+                </div>
                 <div class="date-selector">
                     <input type="date" id="dateInput">
                 </div>
@@ -451,11 +525,24 @@
             </div>
         </div>
         
-        <div class="card-container" id="cardContainer">
-            <div class="loading">
-                <div class="loading-spinner"></div>
-                <p>加载中...</p>
+        <div class="main-content">
+            <div class="card-container" id="cardContainer">
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>加载中...</p>
+                </div>
             </div>
+        </div>
+        
+        <div class="nav-controls">
+            <button class="nav-btn favorite-btn" id="favoriteBtn">❤️ 收藏</button>
+            <button class="nav-btn prev-btn" id="prevBtn">上一篇</button>
+            <button class="nav-btn next-btn" id="nextBtn">下一篇</button>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="browse">浏览论文</div>
+            <div class="tab" data-tab="collection">我的收藏</div>
         </div>
         
         <div class="collection-view" id="collectionView">
@@ -466,26 +553,18 @@
                 </div>
             </div>
         </div>
-        
-        <div class="tabs">
-            <div class="tab active" data-tab="browse">浏览论文</div>
-            <div class="tab" data-tab="collection">我的收藏</div>
-        </div>
-        
-        <div class="swipe-hint">
-            ← 左划收藏 · ↓ 下划下一篇
-        </div>
     </div>
     
     <script>
         class MobileArXivApp {
             constructor() {
-                this.currentDate = this.getToday();
-                this.currentIndex = 0;
+                const savedState = this.loadState();
+                this.currentDate = savedState.date || this.getToday();
+                this.currentIndex = savedState.index || 0;
+                this.currentCategory = savedState.category || 'all';
                 this.papers = [];
                 this.paperData = {};
                 this.filteredPapers = [];
-                this.currentCategory = 'all';
                 this.collections = this.loadCollections();
                 this.repoOwner = 'yp51md';
                 this.repoName = 'daily-arXiv-ai-enhanced';
@@ -509,6 +588,29 @@
                 this.loadPapers();
             }
             
+            loadState() {
+                try {
+                    const stored = localStorage.getItem('arxiv_mobile_state');
+                    return stored ? JSON.parse(stored) : {};
+                } catch (error) {
+                    console.error('加载状态失败:', error);
+                    return {};
+                }
+            }
+            
+            saveState() {
+                try {
+                    const state = {
+                        date: this.currentDate,
+                        index: this.currentIndex,
+                        category: this.currentCategory
+                    };
+                    localStorage.setItem('arxiv_mobile_state', JSON.stringify(state));
+                } catch (error) {
+                    console.error('保存状态失败:', error);
+                }
+            }
+            
             setupDateInput() {
                 const dateInput = document.getElementById('dateInput');
                 dateInput.value = this.currentDate;
@@ -516,6 +618,7 @@
                     this.currentDate = e.target.value;
                     this.currentIndex = 0;
                     this.currentCategory = 'all';
+                    this.saveState();
                     this.loadPapers();
                 });
             }
@@ -566,19 +669,27 @@
                     const diffX = currentX - this.swipeStartX;
                     const diffY = currentY - this.swipeStartY;
                     
-                    // 左划收藏
+                    // 左划收藏（水平滑动）
                     if (diffX < -50 && Math.abs(diffY) < 50) {
                         e.preventDefault();
                         const paper = this.filteredPapers[this.currentIndex];
                         if (paper) {
                             this.toggleFavorite(paper.id);
+                            // 添加滑动动画
+                            const card = cardContainer.querySelector('.paper-card');
+                            if (card) {
+                                card.classList.add('swipe-left');
+                                setTimeout(() => {
+                                    card.classList.remove('swipe-left');
+                                }, 300);
+                            }
                         }
                     }
                     
-                    // 下划下一篇
-                    if (diffY > 50 && Math.abs(diffX) < 50) {
+                    // 右划下一篇（水平滑动）
+                    if (diffX > 50 && Math.abs(diffY) < 50) {
                         e.preventDefault();
-                        this.nextCard();
+                        this.nextCardWithAnimation();
                     }
                 });
                 
@@ -610,6 +721,12 @@
                     this.papers = this.getAllPapers();
                     this.filterPapers();
                     this.renderCategories();
+                    
+                    // 确保当前索引有效
+                    if (this.currentIndex >= this.filteredPapers.length) {
+                        this.currentIndex = Math.max(0, this.filteredPapers.length - 1);
+                        this.saveState();
+                    }
                     
                     if (this.filteredPapers.length === 0) {
                         container.innerHTML = `<div class="error">当天没有论文数据</div>`;
@@ -699,6 +816,7 @@
                         button.classList.add('active');
                         this.filterPapers();
                         this.currentIndex = 0;
+                        this.saveState();
                         this.renderCard(this.currentIndex);
                     });
                 });
@@ -739,13 +857,20 @@
                     return;
                 }
                 
-                const isFavorited = this.isFavorited(paper.id);
+                const totalCount = this.filteredPapers.length;
+                const currentCount = index + 1;
                 
                 container.innerHTML = `
                     <div class="paper-card">
                         <div class="card-content">
-                            <div class="card-header">
+                            <div class="paper-header">
                                 <h2 class="paper-title">${paper.title}</h2>
+                                <div class="paper-info">
+                                    ${paper.authors}
+                                </div>
+                                <div class="paper-meta">
+                                    ${currentCount}/${totalCount}
+                                </div>
                             </div>
                             
                             <div class="ai-summary">${paper.summary}</div>
@@ -788,27 +913,45 @@
                                     <p class="section-content">${paper.conclusion}</p>
                                 </div>
                             ` : ''}
-                            
-                            <div class="card-footer">
-                                <div class="paper-info">
-                                    ${paper.authors}
-                                </div>
-                                <div class="nav-buttons">
-                                    <button class="nav-btn favorite-btn ${isFavorited ? 'favorited' : ''}" onclick="app.toggleFavorite('${paper.id}')">
-                                        ${isFavorited ? '❤️ 已收藏' : '🤍 收藏'}
-                                    </button>
-                                    <button class="nav-btn" onclick="app.prevCard()" ${index === 0 ? 'disabled' : ''}>上一篇</button>
-                                    <button class="nav-btn" onclick="app.nextCard()" ${index === this.filteredPapers.length - 1 ? 'disabled' : ''}>下一篇</button>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 `;
+                
+                this.updateNavButtons();
+                this.updateFavoriteButton();
+            }
+            
+            updateNavButtons() {
+                const prevBtn = document.getElementById('prevBtn');
+                const nextBtn = document.getElementById('nextBtn');
+                
+                if (prevBtn) {
+                    prevBtn.disabled = this.currentIndex === 0;
+                    prevBtn.onclick = () => this.prevCard();
+                }
+                
+                if (nextBtn) {
+                    nextBtn.disabled = this.currentIndex === this.filteredPapers.length - 1;
+                    nextBtn.onclick = () => this.nextCard();
+                }
+            }
+            
+            updateFavoriteButton() {
+                const favoriteBtn = document.getElementById('favoriteBtn');
+                if (favoriteBtn) {
+                    const paper = this.filteredPapers[this.currentIndex];
+                    if (paper) {
+                        const isFavorited = this.isFavorited(paper.id);
+                        favoriteBtn.textContent = isFavorited ? '❤️ 已收藏' : '🤍 收藏';
+                        favoriteBtn.onclick = () => this.toggleFavorite(paper.id);
+                    }
+                }
             }
             
             prevCard() {
                 if (this.currentIndex > 0) {
                     this.currentIndex--;
+                    this.saveState();
                     this.renderCard(this.currentIndex);
                 }
             }
@@ -816,7 +959,23 @@
             nextCard() {
                 if (this.currentIndex < this.filteredPapers.length - 1) {
                     this.currentIndex++;
+                    this.saveState();
                     this.renderCard(this.currentIndex);
+                }
+            }
+            
+            nextCardWithAnimation() {
+                if (this.currentIndex < this.filteredPapers.length - 1) {
+                    const cardContainer = document.getElementById('cardContainer');
+                    const card = cardContainer.querySelector('.paper-card');
+                    if (card) {
+                        card.classList.add('swipe-right');
+                        setTimeout(() => {
+                            this.currentIndex++;
+                            this.saveState();
+                            this.renderCard(this.currentIndex);
+                        }, 300);
+                    }
                 }
             }
             
@@ -833,7 +992,7 @@
                 
                 this.collections[collectionKey] = dayFavorites;
                 this.saveCollections();
-                this.renderCard(this.currentIndex);
+                this.updateFavoriteButton();
             }
             
             isFavorited(paperId) {
