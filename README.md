@@ -55,7 +55,7 @@ Otherwise, you can directly use this repo in https://dw-dengwei.github.io/daily-
 
 ## Mobile Version
 We also provide a dedicated mobile-friendly version for optimal phone experience:
-- **Access**: Open https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/mobile.html in your phone browser
+- **Access**: Open https://yp51md.github.io/daily-arXiv-ai-enhanced/mobile.html in your phone browser
 - **Features**: Full-screen paper cards, easy navigation, local favorites storage, and AI-enhanced content
 - **Usage**: Swipe between papers, tap to favorite, and use the bottom tabs to switch between browsing and favorites
 
