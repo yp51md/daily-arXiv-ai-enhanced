@@ -30,6 +30,26 @@ class BuildChatOpenAIKwargsTests(unittest.TestCase):
             kwargs["extra_body"],
         )
 
+    def test_deepseek_structured_output_disables_thinking(self):
+        for base_url in ("https://api.deepseek.com", "https://api.deepseek.com/v1/"):
+            with self.subTest(base_url=base_url):
+                kwargs = build_chat_openai_kwargs(
+                    model_name="deepseek-v4-pro",
+                    base_url=base_url,
+                    api_key="test-key",
+                )
+                self.assertEqual(
+                    {"thinking": {"type": "disabled"}}, kwargs["extra_body"]
+                )
+
+    def test_other_providers_do_not_receive_deepseek_options(self):
+        kwargs = build_chat_openai_kwargs(
+            model_name="deepseek-v4-pro",
+            base_url="https://api.deepseek.com.example.org/v1",
+            api_key="test-key",
+        )
+        self.assertNotIn("extra_body", kwargs)
+
     def test_processing_error_is_reported_after_a_batch(self):
         """Catches swallowing authentication failures and publishing fallback summaries."""
         with self.assertRaisesRegex(RuntimeError, r"2 paper\(s\) failed"):
