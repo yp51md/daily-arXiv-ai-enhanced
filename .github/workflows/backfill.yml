@@ -1,0 +1,139 @@
+name: arXiv manual announcement backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'First announcement date (YYYY-MM-DD; within the past 90 days)'
+        required: true
+        type: string
+      end_date:
+        description: 'Last announcement date (YYYY-MM-DD; inclusive)'
+        required: true
+        type: string
+      categories:
+        description: 'Comma-separated categories; blank uses repository CATEGORIES'
+        required: false
+        type: string
+      enhance:
+        description: 'Generate AI summaries and Markdown'
+        default: true
+        type: boolean
+      overwrite:
+        description: 'Refetch existing dates and regenerate their summaries'
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: arxiv-manual-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: self-hosted
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    env:
+      START_DATE: ${{ inputs.start_date }}
+      END_DATE: ${{ inputs.end_date }}
+      CATEGORIES: ${{ inputs.categories || vars.CATEGORIES }}
+      LANGUAGE: ${{ vars.LANGUAGE || 'Chinese' }}
+      MODEL_NAME: ${{ vars.MODEL_NAME }}
+      ENHANCE: ${{ inputs.enhance }}
+      OVERWRITE: ${{ inputs.overwrite }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Install uv and dependencies
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          uv sync --locked
+
+      - name: Validate inputs
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+        run: |
+          args=(--start-date "$START_DATE" --end-date "$END_DATE" --store ../archive)
+          if [ "$ENHANCE" = true ]; then args+=(--enhance); fi
+          uv run --no-sync python scripts/backfill_arxiv.py "${args[@]}" --validate-only
+
+      - name: Find data branch
+        id: data_branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set +e
+          git ls-remote --exit-code --heads origin data > /dev/null
+          status=$?
+          set -e
+          case "$status" in
+            0) echo 'exists=true' >> "$GITHUB_OUTPUT"; echo 'ref=data' >> "$GITHUB_OUTPUT" ;;
+            2) echo 'exists=false' >> "$GITHUB_OUTPUT"; echo "ref=$DEFAULT_BRANCH" >> "$GITHUB_OUTPUT" ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: Check out archive separately
+        uses: actions/checkout@v4
+        with:
+          path: archive
+          ref: ${{ steps.data_branch.outputs.ref }}
+          fetch-depth: 1
+
+      - name: Initialize data branch if needed
+        if: steps.data_branch.outputs.exists == 'false'
+        working-directory: archive
+        run: |
+          git checkout --orphan data
+          git rm -rf -- .
+          mkdir -p data assets
+
+      - name: Backfill announcement dates
+        id: backfill
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+        run: |
+          args=(--start-date "$START_DATE" --end-date "$END_DATE" --store ../archive)
+          if [ "$ENHANCE" = true ]; then args+=(--enhance); fi
+          if [ "$OVERWRITE" = true ]; then args+=(--overwrite); fi
+          uv run --no-sync python scripts/backfill_arxiv.py "${args[@]}"
+
+      - name: Save results for recovery
+        if: always() && (steps.backfill.outcome == 'success' || steps.backfill.outcome == 'failure')
+        uses: actions/upload-artifact@v4
+        with:
+          name: announcement-backfill-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            archive/backfill-results/
+            archive/backfill-report.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Commit and publish data
+        working-directory: archive
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          mkdir -p data assets
+          git add -- data assets/file-list.txt
+          if git diff --cached --quiet; then
+            echo 'No data changes to publish.'
+            exit 0
+          fi
+          git commit -m "Backfill arXiv announcements $START_DATE to $END_DATE"
+          # A concurrent data writer causes a safe push failure; never force-push.
+          git push origin HEAD:refs/heads/data

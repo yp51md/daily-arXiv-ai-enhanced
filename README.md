@@ -77,6 +77,10 @@ We also provide a dedicated mobile-friendly version for optimal phone experience
 10. Set up GitHub pages: Go to your own repo -> Settings -> Pages. In `Build and deployment`, set `Source="Deploy from a branch"`, `Branch="main", "/(root)"`. Wait for a few minutes, go to https://\<username\>.github.io/daily-arXiv-ai-enhanced/. Please see this [issue](https://github.com/dw-dengwei/daily-arXiv-ai-enhanced/issues/14) for more precise instructions.
 </details>
 
+## Manual announcement-date backfill
+
+To fetch an inclusive range of arXiv **announcement dates**, use **Actions → arXiv manual announcement backfill → Run workflow**. This independent, manual-only workflow supports the last 90 days, optional AI summaries, and safe reruns on a self-hosted runner. See [the backfill guide](docs/announcement-backfill.md) for inputs, date semantics, and recovery instructions.
+
 # Contributors
 Thanks to the following special contributors for contributing code, discovering bugs, and sharing useful ideas for this project!!!
 If you find that I missed your contribution below, please feel free to contact me through email.
