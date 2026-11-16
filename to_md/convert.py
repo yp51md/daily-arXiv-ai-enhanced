@@ -58,11 +58,11 @@ if __name__ == "__main__":
                         authors=",".join(item["authors"]),
                         summary=item["summary"],
                         url=item['abs'],
-                        tldr=ai_data.get('tldr', ''),
-                        motivation=ai_data.get('motivation', ''),
-                        method=ai_data.get('method', ''),
-                        result=ai_data.get('result', ''),
-                        conclusion=ai_data.get('conclusion', ''),
+                        tldr=ai_data.get('tldr') or 'Not generated',
+                        motivation=ai_data.get('motivation') or 'Not generated',
+                        method=ai_data.get('method') or 'Not generated',
+                        result=ai_data.get('result') or 'Not generated',
+                        conclusion=ai_data.get('conclusion') or 'Not generated',
                         cate=item['categories'][0],
                         idx=next(idx)
                     )

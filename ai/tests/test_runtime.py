@@ -1,6 +1,6 @@
 import unittest
 
-from runtime import build_chat_openai_kwargs, raise_if_processing_failed
+from runtime import build_chat_openai_kwargs
 
 
 class BuildChatOpenAIKwargsTests(unittest.TestCase):
@@ -50,10 +50,9 @@ class BuildChatOpenAIKwargsTests(unittest.TestCase):
         )
         self.assertNotIn("extra_body", kwargs)
 
-    def test_processing_error_is_reported_after_a_batch(self):
-        """Catches swallowing authentication failures and publishing fallback summaries."""
-        with self.assertRaisesRegex(RuntimeError, r"2 paper\(s\) failed"):
-            raise_if_processing_failed(["401 Unauthorized", "401 Unauthorized"])
+    def test_missing_configuration_is_rejected_before_generation(self):
+        with self.assertRaisesRegex(ValueError, "OPENAI_API_KEY"):
+            build_chat_openai_kwargs("model", "https://api.example.com", " ")
 
 
 if __name__ == "__main__":

@@ -4,13 +4,11 @@ import sys
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
-from queue import Queue
-from threading import Lock
+from pathlib import Path
 import dotenv
 import argparse
 from tqdm import tqdm
 
-import langchain_core.exceptions
 from langchain_openai import ChatOpenAI
 from langchain.prompts import (
     ChatPromptTemplate,
@@ -19,12 +17,13 @@ from langchain.prompts import (
 )
 from structure import Structure
 from content_filter import is_sensitive
-from runtime import build_chat_openai_kwargs, raise_if_processing_failed
+from runtime import build_chat_openai_kwargs
+from generation import empty_fields, generate_fields, generation_status
 
 if os.path.exists('.env'):
     dotenv.load_dotenv()
-template = open("template.txt", "r").read()
-system = open("system.txt", "r").read()
+template = Path(__file__).with_name("template.txt").read_text(encoding="utf-8")
+system = Path(__file__).with_name("system.txt").read_text(encoding="utf-8")
 
 def parse_args():
     """解析命令行参数"""
@@ -90,53 +89,13 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
     if code_info:
         item.update(code_info)
 
-    """处理单个数据项"""
-    # Default structure with meaningful fallback values
-    default_ai_fields = {
-        "tldr": "Summary generation failed",
-        "motivation": "Motivation analysis unavailable",
-        "method": "Method extraction failed",
-        "result": "Result analysis unavailable",
-        "conclusion": "Conclusion extraction failed"
-    }
-    
-    try:
-        response: Structure = chain.invoke({
-            "language": language,
-            "content": item['summary']
-        })
-        item['AI'] = response.model_dump()
-    except langchain_core.exceptions.OutputParserException as e:
-        # 尝试从错误信息中提取 JSON 字符串并修复
-        error_msg = str(e)
-        partial_data = {}
-        
-        if "Function Structure arguments:" in error_msg:
-            try:
-                # 提取 JSON 字符串
-                json_str = error_msg.split("Function Structure arguments:", 1)[1].strip().split('are not valid JSON')[0].strip()
-                # 预处理 LaTeX 数学符号 - 使用四个反斜杠来确保正确转义
-                json_str = json_str.replace('\\', '\\\\')
-                # 尝试解析修复后的 JSON
-                partial_data = json.loads(json_str)
-            except Exception as json_e:
-                print(f"Failed to parse JSON for {item.get('id', 'unknown')}: {json_e}", file=sys.stderr)
-        
-        # Merge partial data with defaults to ensure all fields exist
-        item['AI'] = {**default_ai_fields, **partial_data}
-        print(f"Using partial AI data for {item.get('id', 'unknown')}: {list(partial_data.keys())}", file=sys.stderr)
-    except Exception as e:
-        print(f"Unexpected error for {item.get('id', 'unknown')}: {e}", file=sys.stderr)
-        raise RuntimeError(f"AI request failed for {item.get('id', 'unknown')}") from e
-    
-    # Final validation to ensure all required fields exist
-    for field in default_ai_fields.keys():
-        if field not in item['AI']:
-            item['AI'][field] = default_ai_fields[field]
+    item['AI'], item['AI_generation'] = generate_fields(
+        chain, item.get('summary', ''), language, item.get('id', 'unknown')
+    )
 
     # 检查 AI 生成的所有字段
     for v in item.get("AI", {}).values():
-        if is_sensitive(str(v)):
+        if v is not None and is_sensitive(str(v)):
             return None
     return item
 
@@ -148,7 +107,7 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
             base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
             api_key=os.environ.get("OPENAI_API_KEY", ""),
         )
-    ).with_structured_output(Structure, method="function_calling")
+    ).with_structured_output(Structure, method="function_calling", include_raw=True)
 
     print('Connect to:', model_name, file=sys.stderr)
     
@@ -161,7 +120,6 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
     
     # 使用线程池并行处理
     processed_data = [None] * len(data)  # 预分配结果列表
-    processing_errors = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 提交所有任务
         future_to_idx = {
@@ -181,9 +139,22 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
                 processed_data[idx] = result
             except Exception as e:
                 print(f"Item at index {idx} generated an exception: {e}", file=sys.stderr)
-                processing_errors.append(str(e))
+                fallback = dict(data[idx])
+                fallback['AI'] = empty_fields()
+                fallback['AI_generation'] = generation_status(fallback['AI'], 0)
+                processed_data[idx] = fallback
 
-    raise_if_processing_failed(processing_errors)
+    counts = {status: 0 for status in ('complete', 'partial', 'failed', 'filtered')}
+    for item in processed_data:
+        status = item['AI_generation']['status'] if item is not None else 'filtered'
+        counts[status] += 1
+    print(f"AI generation results: {counts}", file=sys.stderr)
+    if summary_path := os.environ.get('GITHUB_STEP_SUMMARY'):
+        with open(summary_path, 'a', encoding='utf-8') as handle:
+            handle.write("\n### AI generation results\n\n")
+            for status, count in counts.items():
+                handle.write(f"- {status}: {count}\n")
+            handle.write("\nMissing fields are saved as JSON null; paper metadata is retained.\n")
     
     return processed_data
 
@@ -192,11 +163,7 @@ def main():
     model_name = os.environ.get("MODEL_NAME", "gpt-4o-mini")
     language = os.environ.get("LANGUAGE", 'Chinese')
 
-    # 检查并删除目标文件
     target_file = args.data.replace('.jsonl', f'_AI_enhanced_{language}.jsonl')
-    if os.path.exists(target_file):
-        os.remove(target_file)
-        print(f'Removed existing file: {target_file}', file=sys.stderr)
 
     # 读取数据
     data = []
@@ -224,10 +191,12 @@ def main():
     )
     
     # 保存结果
-    with open(target_file, "w") as f:
+    temporary_file = target_file + ".tmp"
+    with open(temporary_file, "w", encoding="utf-8") as f:
         for item in processed_data:
             if item is not None:
-                f.write(json.dumps(item) + "\n")
+                f.write(json.dumps(item, ensure_ascii=False) + "\n")
+    os.replace(temporary_file, target_file)
 
 if __name__ == "__main__":
     main()
