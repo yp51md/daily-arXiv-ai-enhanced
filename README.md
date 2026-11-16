@@ -77,6 +77,10 @@ We also provide a dedicated mobile-friendly version for optimal phone experience
 10. Set up GitHub pages: Go to your own repo -> Settings -> Pages. In `Build and deployment`, set `Source="Deploy from a branch"`, `Branch="main", "/(root)"`. Wait for a few minutes, go to https://\<username\>.github.io/daily-arXiv-ai-enhanced/. Please see this [issue](https://github.com/dw-dengwei/daily-arXiv-ai-enhanced/issues/14) for more precise instructions.
 </details>
 
+## AI summary fallback
+
+AI summary generation makes up to three application-level attempts per paper (in addition to SDK transport retries). Valid fields are retained across attempts; missing or invalid fields are saved as JSON `null`. Even when all model requests fail, paper metadata and reports are still generated. Each record includes `AI_generation` status (`complete`, `partial`, or `failed`), and the Actions summary reports the counts. Markdown displays missing fields as `Not generated`; the website falls back to the original abstract when TL;DR is unavailable. Missing configuration and file errors still fail the task, and existing content-filter rules still apply.
+
 ## Manual announcement-date backfill
 
 To fetch an inclusive range of arXiv **announcement dates**, use **Actions → arXiv manual announcement backfill → Run workflow**. This independent, manual-only workflow supports the last 90 days, optional AI summaries, and safe reruns on a self-hosted runner. See [the backfill guide](docs/announcement-backfill.md) for inputs, date semantics, and recovery instructions.
